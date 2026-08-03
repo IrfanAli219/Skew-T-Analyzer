@@ -70,6 +70,18 @@ def quality_control(df: pd.DataFrame) -> None:
 
     check_height(df)
 
+    check_wind_direction(df)
+
+    check_theta(df)
+
+    check_theta_e(df)
+
+    check_theta_v(df)
+
+    check_duplicate_heights(df)
+
+    check_duplicate_rows(df)
+
     print("=" * 50)
 
 def check_pressure(df):
@@ -193,5 +205,95 @@ def check_height(df):
         print("Height Order : PASS")
     else:
         print("Height Order : FAIL")
+
+
+def check_wind_direction(df: pd.DataFrame) -> None:
+    """
+    Check that wind direction is between 0 and 360 degrees.
+    Missing values are ignored.
+    """
+
+    valid = df["DRCT"].dropna()
+
+    invalid = valid[(valid < 0) | (valid > 360)]
+
+    if len(invalid) == 0:
+        print("Wind Direction        : PASS")
+    else:
+        print(f"Wind Direction        : FAIL ({len(invalid)} invalid values)")
+
+
+def check_theta(df: pd.DataFrame) -> None:
+    """
+    Potential temperature must be positive.
+    """
+
+    valid = df["THTA"].dropna()
+
+    invalid = valid[valid <= 0]
+
+    if len(invalid) == 0:
+        print("Potential Temperature : PASS")
+    else:
+        print(f"Potential Temperature : FAIL ({len(invalid)} invalid values)")
+
+
+def check_theta_e(df: pd.DataFrame) -> None:
+    """
+    Equivalent potential temperature must be positive.
+    """
+
+    valid = df["THTE"].dropna()
+
+    invalid = valid[valid <= 0]
+
+    if len(invalid) == 0:
+        print("Equivalent Theta-E    : PASS")
+    else:
+        print(f"Equivalent Theta-E    : FAIL ({len(invalid)} invalid values)")
+
+
+
+def check_theta_v(df: pd.DataFrame) -> None:
+    """
+    Virtual potential temperature must be positive.
+    """
+
+    valid = df["THTV"].dropna()
+
+    invalid = valid[valid <= 0]
+
+    if len(invalid) == 0:
+        print("Virtual Theta-V       : PASS")
+    else:
+        print(f"Virtual Theta-V       : FAIL ({len(invalid)} invalid values)")
+
+
+
+def check_duplicate_heights(df: pd.DataFrame) -> None:
+    """
+    Check duplicate height levels.
+    """
+
+    duplicates = df["HGHT"].duplicated().sum()
+
+    if duplicates == 0:
+        print("Duplicate Heights     : PASS")
+    else:
+        print(f"Duplicate Heights     : FAIL ({duplicates} duplicates)")
+
+
+def check_duplicate_rows(df: pd.DataFrame) -> None:
+    """
+    Check duplicate rows.
+    """
+
+    duplicates = df.duplicated().sum()
+
+    if duplicates == 0:
+        print("Duplicate Rows        : PASS")
+    else:
+        print(f"Duplicate Rows        : FAIL ({duplicates} duplicates)")
+
 
 

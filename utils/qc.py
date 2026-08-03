@@ -87,7 +87,8 @@ def quality_control(df: pd.DataFrame) -> None:
 
     check_height_difference(df)
     check_pressure_step(df)
-
+    check_temperature_gradient(df)
+    check_dewpoint_depression(df)
     print("=" * 50)
 
 def check_pressure(df):
@@ -341,5 +342,50 @@ def check_pressure_step(df: pd.DataFrame) -> None:
         print("Pressure Step          : PASS")
     else:
         print(f"Pressure Step          : FAIL ({invalid} invalid levels)")
+
+
+def check_temperature_gradient(df: pd.DataFrame) -> None:
+    """
+    Check for unrealistic temperature changes
+    between adjacent levels.
+    """
+
+    temp = df["TEMP"].dropna().reset_index(drop=True)
+
+    invalid = 0
+
+    for i in range(1, len(temp)):
+
+        difference = abs(temp.iloc[i] - temp.iloc[i - 1])
+
+        if difference > 30:
+            invalid += 1
+
+    if invalid == 0:
+        print("Temperature Gradient   : PASS")
+    else:
+        print(f"Temperature Gradient   : WARNING ({invalid} large jumps)")
+
+
+def check_dewpoint_depression(df: pd.DataFrame) -> None:
+    """
+    Check for unrealistic dew point depression.
+    """
+
+    valid = df[["TEMP", "DWPT"]].dropna()
+
+    invalid = 0
+
+    for _, row in valid.iterrows():
+
+        depression = row["TEMP"] - row["DWPT"]
+
+        if depression > 80:
+            invalid += 1
+
+    if invalid == 0:
+        print("Dew Point Depression   : PASS")
+    else:
+        print(f"Dew Point Depression   : WARNING ({invalid} suspicious levels)")
 
 

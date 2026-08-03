@@ -82,6 +82,12 @@ def quality_control(df: pd.DataFrame) -> None:
 
     check_duplicate_rows(df)
 
+    print("\nLevel-3 Scientific Checks")
+    print("-" * 50)
+
+    check_height_difference(df)
+    check_pressure_step(df)
+
     print("=" * 50)
 
 def check_pressure(df):
@@ -295,5 +301,45 @@ def check_duplicate_rows(df: pd.DataFrame) -> None:
     else:
         print(f"Duplicate Rows        : FAIL ({duplicates} duplicates)")
 
+
+
+def check_height_difference(df: pd.DataFrame) -> None:
+    """
+    Check that height increases with altitude.
+    """
+
+    heights = df["HGHT"].dropna().reset_index(drop=True)
+
+    invalid = 0
+
+    for i in range(1, len(heights)):
+
+        if heights.iloc[i] <= heights.iloc[i - 1]:
+            invalid += 1
+
+    if invalid == 0:
+        print("Height Difference      : PASS")
+    else:
+        print(f"Height Difference      : FAIL ({invalid} invalid levels)")
+
+
+def check_pressure_step(df: pd.DataFrame) -> None:
+    """
+    Check pressure decreases between adjacent levels.
+    """
+
+    pressure = df["PRES"].dropna().reset_index(drop=True)
+
+    invalid = 0
+
+    for i in range(1, len(pressure)):
+
+        if pressure.iloc[i] >= pressure.iloc[i - 1]:
+            invalid += 1
+
+    if invalid == 0:
+        print("Pressure Step          : PASS")
+    else:
+        print(f"Pressure Step          : FAIL ({invalid} invalid levels)")
 
 

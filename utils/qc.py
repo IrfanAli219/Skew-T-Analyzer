@@ -89,6 +89,9 @@ def quality_control(df: pd.DataFrame) -> None:
     check_pressure_step(df)
     check_temperature_gradient(df)
     check_dewpoint_depression(df)
+    check_missing_profile(df)
+
+    
     print("=" * 50)
 
 def check_pressure(df):
@@ -387,5 +390,51 @@ def check_dewpoint_depression(df: pd.DataFrame) -> None:
         print("Dew Point Depression   : PASS")
     else:
         print(f"Dew Point Depression   : WARNING ({invalid} suspicious levels)")
+
+
+def check_missing_profile(df: pd.DataFrame) -> None:
+    """
+    Check profile completeness based on missing values.
+    """
+
+    print("\nProfile Completeness")
+    print("-" * 50)
+
+    overall_status = "GOOD"
+
+    total_rows = len(df)
+
+    for column in df.columns:
+
+        missing = df[column].isna().sum()
+
+        percent = (missing / total_rows) * 100
+
+        if percent == 0:
+            status = "GOOD"
+
+        elif percent <= 30:
+            status = "GOOD"
+
+        elif percent <= 70:
+            status = "WARNING"
+
+            if overall_status == "GOOD":
+                overall_status = "WARNING"
+
+        else:
+            status = "BAD"
+
+            overall_status = "BAD"
+
+        print(
+            f"{column:5} : {status:8} "
+            f"({percent:.1f}% missing)"
+        )
+
+    print("-" * 50)
+
+    print(f"Overall Profile : {overall_status}")
+
 
 

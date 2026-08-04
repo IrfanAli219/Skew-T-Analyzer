@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 
 from metpy.plots import SkewT
 from metpy.units import units
+from pathlib import Path
 
 from utils.parser import (
     read_file,
@@ -44,61 +45,26 @@ print("\nStep 3 : Searching Maximum Profile...")
 
 max_rows = 0
 best_launch = None
-bad_launches = []
 
 for i, launch in enumerate(launches):
 
-    # Progress every 500 launches
     if i % 500 == 0:
         print(f"Processing Launch {i}/{len(launches)}")
 
-    try:
+    raw_data = extract_launch_lines(
+        lines,
+        launch["start_line"]
+    )
 
-        raw_data = extract_launch_lines(
-            lines,
-            launch["start_line"]
-        )
+    df = create_dataframe(raw_data)
 
-        df = create_dataframe(raw_data)
+    rows = len(df)
 
-        rows = len(df)
+    if rows > max_rows:
+        max_rows = rows
+        best_launch = launch
 
-        if rows > max_rows:
-
-            max_rows = rows
-            best_launch = launch
-
-    except Exception as e:
-
-        bad_launches.append((i, launch["launch"]))
-
-        print("\n" + "=" * 70)
-        print("ERROR FOUND")
-        print("=" * 70)
-
-        print(f"Launch Index : {i}")
-        print(launch)
-
-        print("\nException")
-        print(e)
-
-        print("\nRaw Data")
-        print("-" * 70)
-
-        for line in raw_data:
-            print(repr(line))
-
-        print("-" * 70)
-
-        # Stop after first bad launch
-        break
-
-# ==========================================================
-# Results
-# ==========================================================
-
-print("\n")
-print("=" * 70)
+print("\n" + "=" * 70)
 print("RESULT")
 print("=" * 70)
 
@@ -107,4 +73,98 @@ print(best_launch)
 
 print(f"\nMaximum Levels : {max_rows}")
 
-print(f"\nBad Launches : {len(bad_launches)}")
+# ==========================================================
+# Load Best Launch
+# ==========================================================
+
+print("\nStep 4 : Loading Best Launch...")
+
+raw_data = extract_launch_lines(
+    lines,
+    best_launch["start_line"]
+)
+
+df = create_dataframe(raw_data)
+
+print(df.head())
+
+# ==========================================================
+# Remove Missing Values
+# ==========================================================
+
+df = df.dropna(
+    subset=[
+        "PRES",
+        "TEMP",
+        "DWPT"
+    ]
+)
+
+# ==========================================================
+# Prepare Variables
+# ==========================================================
+
+pressure = df["PRES"].values * units.hPa
+temperature = df["TEMP"].values * units.degC
+dewpoint = df["DWPT"].values * units.degC
+
+# ==========================================================
+# Create Skew-T Diagram
+# ==========================================================
+
+print("\nStep 5 : Creating Skew-T Diagram...")
+
+fig = plt.figure(figsize=(9, 9))
+
+skew = SkewT(fig)
+skew.ax.set_xlim(-50, 60)
+
+skew.plot(
+    pressure,
+    temperature,
+    "r",
+    linewidth=2,
+    label="Temperature"
+)
+
+skew.plot(
+    pressure,
+    dewpoint,
+    "g",
+    linewidth=2,
+    label="Dew Point"
+)
+
+skew.ax.set_title(
+    f'{best_launch["station"]}  |  {best_launch["launch"]}'
+)
+
+skew.ax.legend()
+
+# ==========================================================
+# Save Figure
+# ==========================================================
+
+output_dir = Path("output/plots")
+output_dir.mkdir(
+    parents=True,
+    exist_ok=True
+)
+
+filename = (
+    f"{best_launch['station']}_"
+    f"{best_launch['launch'].replace(':', '-')}.png"
+)
+
+save_path = output_dir / filename
+
+plt.savefig(
+    save_path,
+    dpi=300,
+    bbox_inches="tight"
+)
+
+plt.close()
+
+print("\nDiagram Saved Successfully")
+print(save_path)

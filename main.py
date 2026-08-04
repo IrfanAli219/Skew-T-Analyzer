@@ -11,11 +11,36 @@ from utils.parser import (
     create_dataframe
 )
 
+
+# ==================================================
+# User Input
+# ==================================================
+
+station_name = input("Station Name : ").strip()
+
+station_number = input("Station Number : ").strip()
+
+launch_time = input(
+    "Launch Time (YYYY_MM_DD_HH) : "
+).strip()
+
+launch_time = launch_time.replace("_", "-")
+
+date_part = launch_time[:10]
+hour_part = launch_time[-2:]
+
+launch_time = f"{date_part} {hour_part}:00:00"
+
+
 # ==========================================================
 # File Path
 # ==========================================================
 
-FILE_PATH = "/home/irfan/new/irfan laptop/Radiosonde_system/SkewT_Analyzer/input/Srinagar.txt"
+FILE_PATH = (
+    "/home/irfan/new/irfan laptop/"
+    "Radiosonde_system/SkewT_Analyzer/input/"
+    f"{station_name}.txt"
+)
 
 # ==========================================================
 # Read File
@@ -43,35 +68,31 @@ print(f"Done. Total Launches : {len(launches)}")
 
 print("\nStep 3 : Searching Maximum Profile...")
 
-max_rows = 0
-best_launch = None
 
-for i, launch in enumerate(launches):
+selected_launch = None
 
-    if i % 500 == 0:
-        print(f"Processing Launch {i}/{len(launches)}")
+for launch in launches:
 
-    raw_data = extract_launch_lines(
-        lines,
-        launch["start_line"]
-    )
+    if (
+        launch["station"] == station_name
+        and launch["station_number"] == station_number
+        and launch["launch"] == launch_time
+    ):
 
-    df = create_dataframe(raw_data)
+        selected_launch = launch
+        break
+if selected_launch is None:
 
-    rows = len(df)
+    print("\nLaunch Not Found.")
+    quit()
 
-    if rows > max_rows:
-        max_rows = rows
-        best_launch = launch
+print("\nLaunch Found")
+print(selected_launch)
 
 print("\n" + "=" * 70)
-print("RESULT")
+print("SELECTED LAUNCH")
 print("=" * 70)
-
-print("\nMaximum Observation Launch")
-print(best_launch)
-
-print(f"\nMaximum Levels : {max_rows}")
+print(selected_launch)
 
 # ==========================================================
 # Load Best Launch
@@ -81,7 +102,7 @@ print("\nStep 4 : Loading Best Launch...")
 
 raw_data = extract_launch_lines(
     lines,
-    best_launch["start_line"]
+    selected_launch["start_line"]
 )
 
 df = create_dataframe(raw_data)
@@ -117,7 +138,20 @@ print("\nStep 5 : Creating Skew-T Diagram...")
 fig = plt.figure(figsize=(9, 9))
 
 skew = SkewT(fig)
-skew.ax.set_xlim(-50, 60)
+temperature = df["TEMP"].values
+dewpoint = df["DWPT"].values
+
+xmin = min(
+    temperature.min(),
+    dewpoint.min()
+) - 10
+
+xmax = max(
+    temperature.max(),
+    dewpoint.max()
+) + 10
+
+skew.ax.set_xlim(xmin, xmax)
 
 skew.plot(
     pressure,
@@ -136,7 +170,7 @@ skew.plot(
 )
 
 skew.ax.set_title(
-    f'{best_launch["station"]}  |  {best_launch["launch"]}'
+    f'{selected_launch["station"]}  |  {selected_launch["launch"]}'
 )
 
 skew.ax.legend()
@@ -150,10 +184,22 @@ output_dir.mkdir(
     parents=True,
     exist_ok=True
 )
+pressure = df["PRES"].values
 
+# Highest pressure (surface)
+bottom = pressure.max()
+
+# Lowest pressure (top of atmosphere)
+top = pressure.min()
+
+# Round to nearest 10 hPa
+bottom = (bottom // 10 + 1) * 10
+top = max(1, (top // 10) * 10)
+
+skew.ax.set_ylim(bottom, top)
 filename = (
-    f"{best_launch['station']}_"
-    f"{best_launch['launch'].replace(':', '-')}.png"
+    f"{selected_launch['station']}_"
+    f"{selected_launch['launch'].replace(':', '-')}.png"
 )
 
 save_path = output_dir / filename

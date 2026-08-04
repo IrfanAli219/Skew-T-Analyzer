@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from metpy.plots import SkewT
 from metpy.units import units
 from pathlib import Path
+from metpy.calc import wind_components
 
 from utils.parser import (
     read_file,
@@ -141,17 +142,8 @@ skew = SkewT(fig)
 temperature = df["TEMP"].values
 dewpoint = df["DWPT"].values
 
-xmin = min(
-    temperature.min(),
-    dewpoint.min()
-) - 10
-
-xmax = max(
-    temperature.max(),
-    dewpoint.max()
-) + 10
-
-skew.ax.set_xlim(xmin, xmax)
+# Standard Skew-T Temperature Range
+skew.ax.set_xlim(-55, 50)
 
 skew.plot(
     pressure,
@@ -176,6 +168,71 @@ skew.ax.set_title(
 skew.ax.legend()
 
 # ==========================================================
+# Wind Barbs (Standard Pressure Levels)
+# ==========================================================
+
+standard_levels = [
+    1000,
+    925,
+    850,
+    700,
+    500,
+    400,
+    300,
+    250,
+    200,
+    150,
+    100
+]
+
+wind_df = df.dropna(
+    subset=["PRES", "DRCT", "SPED"]
+).copy()
+
+selected_rows = []
+
+for level in standard_levels:
+
+    difference = (wind_df["PRES"] - level).abs()
+
+    if difference.empty:
+        continue
+
+    idx = difference.idxmin()
+
+    if abs(wind_df.loc[idx, "PRES"] - level) <= 25:
+        selected_rows.append(idx)
+
+wind_df = wind_df.loc[selected_rows]
+
+# ----------------------------------------------------------
+# Convert wind speed & direction to U and V components
+# ----------------------------------------------------------
+
+wind_speed = wind_df["SPED"].values * units("m/s")
+wind_direction = wind_df["DRCT"].values * units.degree
+
+u, v = wind_components(
+    wind_speed,
+    wind_direction
+)
+
+# ----------------------------------------------------------
+# Plot Wind Barbs
+# ----------------------------------------------------------
+
+skew.plot_barbs(
+    wind_df["PRES"].values * units.hPa,
+    u,
+    v,
+    xloc=1.1,      # aur right side le jao
+    length=6.5,
+    linewidth=0.8
+)
+
+plt.subplots_adjust(right=0.70)
+
+# ==========================================================
 # Save Figure
 # ==========================================================
 
@@ -186,17 +243,24 @@ output_dir.mkdir(
 )
 pressure = df["PRES"].values
 
-# Highest pressure (surface)
-bottom = pressure.max()
+# ==========================================================
+# Standard Pressure Range (1050 -> 100 hPa)
+# ==========================================================
 
-# Lowest pressure (top of atmosphere)
-top = pressure.min()
-
-# Round to nearest 10 hPa
-bottom = (bottom // 10 + 1) * 10
-top = max(1, (top // 10) * 10)
-
-skew.ax.set_ylim(bottom, top)
+skew.ax.set_ylim(1050, 100)
+skew.ax.set_yticks([
+    1000,
+    925,
+    850,
+    700,
+    500,
+    400,
+    300,
+    250,
+    200,
+    150,
+    100
+])
 filename = (
     f"{selected_launch['station']}_"
     f"{selected_launch['launch'].replace(':', '-')}.png"
@@ -207,7 +271,8 @@ save_path = output_dir / filename
 plt.savefig(
     save_path,
     dpi=300,
-    bbox_inches="tight"
+    bbox_inches="tight",
+    pad_inches=0.4
 )
 
 plt.close()

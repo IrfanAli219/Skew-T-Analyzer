@@ -13,6 +13,7 @@ from utils.parser import (
 )
 from utils.interpolation import create_height_grid
 from utils.interpolation import interpolate_profile
+from utils.timeseries import load_interpolated_profiles
 
 
 
@@ -63,6 +64,17 @@ print(f"Done. Total Lines : {len(lines)}")
 print("\nStep 2 : Extracting Metadata...")
 
 launches = extract_metadata(lines)
+
+print("\nStep 6 : Loading All Profiles...")
+
+profiles = load_interpolated_profiles(
+    lines,
+    launches
+)
+
+print(f"\nProfiles Loaded : {len(profiles)}")
+
+quit()
 
 print(f"Done. Total Launches : {len(launches)}")
 
@@ -118,26 +130,7 @@ df = interpolate_profile(df)
 
 print("\nInterpolated Profile")
 print(df.head())
-quit()
-# ==========================================================
-# Test Height Grid
-# ==========================================================
 
-print("\nStep 5 : Creating Height Grid...")
-
-height_grid = create_height_grid(
-    min_height=df["HGHT"].min(),
-    max_height=df["HGHT"].max(),
-    step=100
-)
-
-print("\nMinimum Height :", df["HGHT"].min())
-print("Maximum Height :", df["HGHT"].max())
-
-print("\nHeight Grid")
-print(height_grid)
-
-print(f"\nTotal Grid Levels : {len(height_grid)}")
 # ==========================================================
 # Remove Missing Values
 # ==========================================================

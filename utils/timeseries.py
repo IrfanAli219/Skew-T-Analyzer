@@ -103,3 +103,72 @@ def load_interpolated_profiles(
     print("========================================")
 
     return profiles
+
+# ==========================================================
+# Extract Time Series at One Height
+# ==========================================================
+
+def extract_variable_timeseries(
+    profiles,
+    height,
+    variable
+):
+    """
+    Extract one variable at a given height from
+    every interpolated radiosonde profile.
+
+    Parameters
+    ----------
+    profiles : list
+        Output of load_interpolated_profiles()
+
+    height : int
+        Height in meters.
+
+    variable : str
+        Example:
+        TEMP
+        DWPT
+        PRES
+        RELH
+        MIXR
+        SPED
+        THTA
+        THTE
+        THTV
+
+    Returns
+    -------
+    pandas.DataFrame
+    """
+
+    import pandas as pd
+
+    rows = []
+
+    for profile in profiles:
+
+        df = profile["profile"]
+
+        row = df[df["HGHT"] == height]
+
+        if row.empty:
+            continue
+
+        rows.append(
+            {
+                "Launch": profile["launch"],
+                "Station": profile["station"],
+                "Station_Number": profile["station_number"],
+                "Height": height,
+                variable: row.iloc[0][variable]
+            }
+        )
+
+    ts = pd.DataFrame(rows)
+
+    if not ts.empty:
+        ts["Launch"] = pd.to_datetime(ts["Launch"])
+        ts = ts.sort_values("Launch").reset_index(drop=True)
+
+    return ts

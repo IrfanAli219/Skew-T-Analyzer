@@ -10,6 +10,7 @@ from utils.parser import read_file, extract_metadata
 from utils.timeseries import load_interpolated_profiles
 from utils.plot_skewt import plot_skewt
 from utils.plot_timeseries import plot_timeseries
+from utils.qc import quality_control
 
 
 # ==========================================================
@@ -61,7 +62,8 @@ def show_menu():
     print("3. Relative Humidity Time Series")
     print("4. Wind Speed Time Series")
     print("5. Pressure Time Series")
-    print("6. Exit")
+    print("6. Run Quality Control")
+    print("7. Exit")
 
     return input("\nChoice : ").strip()
 
@@ -166,6 +168,20 @@ def main():
             plot_timeseries(profiles, "PRES", "Pressure (hPa)")
 
         elif choice == "6":
+
+            launch_time = format_launch_time(
+                input("\nLaunch Time (YYYY_MM_DD_HH) : ")
+            )
+
+            profile = find_profile(profiles, launch_time)
+
+            if profile is None:
+                print("\nLaunch Not Found.")
+                continue
+
+            quality_control(profile["raw"])
+
+        elif choice == "7":
             print("\nExiting...")
             break
 

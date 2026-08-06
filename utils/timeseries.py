@@ -27,7 +27,7 @@ def load_interpolated_profiles(
     """
     Read every radiosonde launch, interpolate it
     onto a standard height grid and return all
-    profiles.
+    profiles (raw + interpolated).
 
     Parameters
     ----------
@@ -80,7 +80,7 @@ def load_interpolated_profiles(
             )
 
             # --------------------------------------
-            # Store profile
+            # Store profile (raw + interpolated)
             # --------------------------------------
 
             profiles.append(
@@ -88,12 +88,13 @@ def load_interpolated_profiles(
                     "station": launch["station"],
                     "station_number": launch["station_number"],
                     "launch": launch["launch"],
+                    "raw": df,
                     "profile": interpolated_df
                 }
             )
 
         except Exception:
-            skipped +=1
+            skipped += 1
             continue
 
     print("\n========================================")
@@ -103,6 +104,7 @@ def load_interpolated_profiles(
     print("========================================")
 
     return profiles
+
 
 # ==========================================================
 # Extract Time Series at One Height
@@ -116,30 +118,6 @@ def extract_variable_timeseries(
     """
     Extract one variable at a given height from
     every interpolated radiosonde profile.
-
-    Parameters
-    ----------
-    profiles : list
-        Output of load_interpolated_profiles()
-
-    height : int
-        Height in meters.
-
-    variable : str
-        Example:
-        TEMP
-        DWPT
-        PRES
-        RELH
-        MIXR
-        SPED
-        THTA
-        THTE
-        THTV
-
-    Returns
-    -------
-    pandas.DataFrame
     """
 
     import pandas as pd

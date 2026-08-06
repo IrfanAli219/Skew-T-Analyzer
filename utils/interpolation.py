@@ -1,166 +1,127 @@
 """
-interpolation.py
+plot_skewt.py
 
-Interpolation of radiosonde profiles
-onto a standard height grid.
+Builds a Skew-T Log-P diagram for one radiosonde launch.
+Uses the RAW (uninterpolated) profile so wind direction
+data is available for the barbs.
 """
 
-import numpy as np
-import pandas as pd
+import matplotlib.pyplot as plt
+from pathlib import Path
+
+from metpy.plots import SkewT
+from metpy.units import units
+from metpy.calc import wind_components
 
 
-# ==========================================================
-# Create Height Grid
-# ==========================================================
+STANDARD_LEVELS = [
+    1000, 925, 850, 700, 500,
+    400, 300, 250, 200, 150, 100
+]
 
-def create_height_grid(
-    min_height,
-    max_height,
-    step=100
-):
+
+def plot_skewt(profile, output_dir="output/plots"):
     """
-    Create a regular height grid.
-    """
-
-    start = int(min_height)
-    end = int(max_height)
-
-    return np.arange(
-        start,
-        end + step,
-        step
-    )
-
-
-# ==========================================================
-# Interpolate Profile
-# ==========================================================
-
-def interpolate_profile(
-    df,
-    step=100,
-    method="linear"
-):
-    """
-    Interpolate one radiosonde profile onto a
-    regular height grid.
+    Plot and save a Skew-T diagram for a single launch.
 
     Parameters
     ----------
-    df : pandas.DataFrame
-        Radiosonde profile.
+    profile : dict
+        One entry from the `profiles` list — must contain
+        'station', 'launch', and 'raw' (DataFrame) keys.
 
-    step : int
-        Height interval in meters.
-
-    method : str
-        Interpolation method.
-        (Currently only 'linear' is supported.)
-
-    Returns
-    -------
-    interpolated : pandas.DataFrame
-        Interpolated profile.
-
-    height_grid : numpy.ndarray
-        Standard height grid.
+    output_dir : str
+        Folder to save the resulting PNG.
     """
 
-    # ------------------------------------------------------
-    # Remove rows without height
-    # ------------------------------------------------------
-
-    df = df.dropna(
-        subset=["HGHT"]
-    ).copy()
+    station = profile["station"]
+    launch = profile["launch"]
+    df = profile["raw"]
 
     # ------------------------------------------------------
-    # Sort by height
+    # Clean Data
     # ------------------------------------------------------
 
-    df = df.sort_values(
-        "HGHT"
-    )
+    data = df.dropna(subset=["PRES", "TEMP", "DWPT"])
+
+    pressure = data["PRES"].values * units.hPa
+    temperature = data["TEMP"].values
+    dewpoint = data["DWPT"].values
 
     # ------------------------------------------------------
-    # Remove duplicate heights
+    # Create Figure
     # ------------------------------------------------------
 
-    df = df.drop_duplicates(
-        subset="HGHT",
-        keep="first"
-    )
+    fig = plt.figure(figsize=(9, 9))
+    skew = SkewT(fig)
+
+    skew.ax.set_xlim(-55, 50)
+
+    skew.plot(pressure, temperature, "r", linewidth=2, label="Temperature")
+    skew.plot(pressure, dewpoint, "g", linewidth=2, label="Dew Point")
+
+    skew.ax.set_title(f"{station}  |  {launch}")
+    skew.ax.legend()
 
     # ------------------------------------------------------
-    # Create height grid
+    # Wind Barbs (Standard Pressure Levels)
     # ------------------------------------------------------
 
-    height_grid = create_height_grid(
-        df["HGHT"].min(),
-        df["HGHT"].max(),
-        step
-    )
+    wind_df = df.dropna(subset=["PRES", "DRCT", "SPED"]).copy()
 
-    # ------------------------------------------------------
-    # Output DataFrame
-    # ------------------------------------------------------
+    selected_rows = []
 
-    interpolated = pd.DataFrame()
+    for level in STANDARD_LEVELS:
 
-    interpolated["HGHT"] = height_grid
+        difference = (wind_df["PRES"] - level).abs()
 
-    # ------------------------------------------------------
-    # Variables to interpolate
-    # ------------------------------------------------------
-
-    variables = [
-        "PRES",
-        "TEMP",
-        "DWPT",
-        "RELH",
-        "MIXR",
-        "SPED",
-        "THTA",
-        "THTE",
-        "THTV"
-    ]
-
-    # ------------------------------------------------------
-    # Interpolate Variables
-    # ------------------------------------------------------
-
-    for variable in variables:
-
-        valid = df[
-            ["HGHT", variable]
-        ].dropna()
-
-        if len(valid) < 2:
-
-            interpolated[variable] = np.nan
+        if difference.empty:
             continue
 
-        if method == "linear":
+        idx = difference.idxmin()
 
-            interpolated[variable] = np.interp(
-                height_grid,
-                valid["HGHT"],
-                valid[variable]
-            )
+        if abs(wind_df.loc[idx, "PRES"] - level) <= 25:
+            selected_rows.append(idx)
 
-        else:
+    wind_df = wind_df.loc[selected_rows]
 
-            raise ValueError(
-                f"Interpolation method '{method}' is not supported."
-            )
+    if not wind_df.empty:
+
+        wind_speed = wind_df["SPED"].values * units("m/s")
+        wind_direction = wind_df["DRCT"].values * units.degree
+
+        u, v = wind_components(wind_speed, wind_direction)
+
+        skew.plot_barbs(
+            wind_df["PRES"].values * units.hPa,
+            u,
+            v,
+            xloc=1.1,
+            length=6.5,
+            linewidth=0.8
+        )
+
+    plt.subplots_adjust(right=0.70)
 
     # ------------------------------------------------------
-    # Reset Index
+    # Pressure Axis
     # ------------------------------------------------------
 
-    interpolated.reset_index(
-        drop=True,
-        inplace=True
-    )
+    skew.ax.set_ylim(1050, 100)
+    skew.ax.set_yticks(STANDARD_LEVELS)
 
-    return interpolated, height_grid
+    # ------------------------------------------------------
+    # Save
+    # ------------------------------------------------------
+
+    out_dir = Path(output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    filename = f"{station}_{launch.replace(':', '-')}.png"
+    save_path = out_dir / filename
+
+    plt.savefig(save_path, dpi=300, bbox_inches="tight", pad_inches=0.4)
+    plt.close()
+
+    print("\nDiagram Saved Successfully")
+    print(save_path)

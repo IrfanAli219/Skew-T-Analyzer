@@ -14,6 +14,7 @@ from utils.parser import (
 from utils.interpolation import create_height_grid
 from utils.interpolation import interpolate_profile
 from utils.timeseries import load_interpolated_profiles
+from utils.timeseries import extract_variable_timeseries
 
 
 
@@ -71,6 +72,25 @@ profiles = load_interpolated_profiles(
     lines,
     launches
 )
+
+# ==========================================================
+# Test Time Series Extraction
+# ==========================================================
+
+height = 5000
+variable = "TEMP"
+
+ts = extract_variable_timeseries(
+    profiles,
+    height,
+    variable
+)
+
+print("\nTime Series")
+
+print(ts.head())
+
+print("\nTotal Observations :", len(ts))
 
 print(f"\nProfiles Loaded : {len(profiles)}")
 

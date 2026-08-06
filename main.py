@@ -1,322 +1,177 @@
-import matplotlib.pyplot as plt
+"""
+main.py
 
-from metpy.plots import SkewT
-from metpy.units import units
-from pathlib import Path
-from metpy.calc import wind_components
+SkewT-LogP Analyzer
+Entry point — loads all profiles for a station once,
+then provides an interactive menu for various analyses.
+"""
 
-from utils.parser import (
-    read_file,
-    extract_metadata,
-    extract_launch_lines,
-    create_dataframe
-)
-from utils.interpolation import create_height_grid
-from utils.interpolation import interpolate_profile
+from utils.parser import read_file, extract_metadata
 from utils.timeseries import load_interpolated_profiles
-from utils.timeseries import extract_variable_timeseries
-
-
-
-# ==================================================
-# User Input
-# ==================================================
-
-station_name = input("Station Name : ").strip()
-
-station_number = input("Station Number : ").strip()
-
-launch_time = input(
-    "Launch Time (YYYY_MM_DD_HH) : "
-).strip()
-
-launch_time = launch_time.replace("_", "-")
-
-date_part = launch_time[:10]
-hour_part = launch_time[-2:]
-
-launch_time = f"{date_part} {hour_part}:00:00"
+from utils.plot_skewt import plot_skewt
+from utils.plot_timeseries import plot_timeseries
 
 
 # ==========================================================
-# File Path
+# Helper - Find Profile By Launch Time
 # ==========================================================
 
-FILE_PATH = (
-    "/home/irfan/new/irfan laptop/"
-    "Radiosonde_system/SkewT_Analyzer/input/"
-    f"{station_name}.txt"
-)
+def find_profile(profiles, launch_time):
+    """
+    Find a stored profile matching an exact launch time.
+    """
+
+    for profile in profiles:
+
+        if profile["launch"] == launch_time:
+            return profile
+
+    return None
+
 
 # ==========================================================
-# Read File
+# Helper - Format Launch Time Input
 # ==========================================================
 
-print("Step 1 : Reading File...")
+def format_launch_time(raw_input):
+    """
+    Convert '2026_07_30_00' style input into
+    '2026-07-30 00:00:00' format used in the data.
+    """
 
-lines = read_file(FILE_PATH)
+    raw_input = raw_input.strip().replace("_", "-")
 
-print(f"Done. Total Lines : {len(lines)}")
+    date_part = raw_input[:10]
+    hour_part = raw_input[-2:]
+
+    return f"{date_part} {hour_part}:00:00"
+
 
 # ==========================================================
-# Read Metadata
+# Menu
 # ==========================================================
 
-print("\nStep 2 : Extracting Metadata...")
+def show_menu():
 
-launches = extract_metadata(lines)
+    print("\n" + "=" * 40)
+    print("Radiosonde Analyzer")
+    print("=" * 40)
+    print("1. Skew-T Diagram")
+    print("2. Temperature Time Series")
+    print("3. Relative Humidity Time Series")
+    print("4. Wind Speed Time Series")
+    print("5. Pressure Time Series")
+    print("6. Exit")
 
-print("\nStep 6 : Loading All Profiles...")
+    return input("\nChoice : ").strip()
 
-profiles = load_interpolated_profiles(
-    lines,
-    launches
-)
 
 # ==========================================================
-# Test Time Series Extraction
+# Main
 # ==========================================================
 
-height = 5000
-variable = "TEMP"
+def main():
 
-ts = extract_variable_timeseries(
-    profiles,
-    height,
-    variable
-)
+    # ------------------------------------------------------
+    # User Input
+    # ------------------------------------------------------
 
-print("\nTime Series")
+    station_name = input("Station Name : ").strip()
+    station_number = input("Station Number : ").strip()
 
-print(ts.head())
+    # ------------------------------------------------------
+    # File Path
+    # ------------------------------------------------------
 
-print("\nTotal Observations :", len(ts))
+    FILE_PATH = (
+        "/home/irfan/new/irfan laptop/"
+        "Radiosonde_system/SkewT_Analyzer/input/"
+        f"{station_name}.txt"
+    )
 
-print(f"\nProfiles Loaded : {len(profiles)}")
+    # ------------------------------------------------------
+    # Read File
+    # ------------------------------------------------------
 
-quit()
+    print("\nStep 1 : Reading File...")
 
-print(f"Done. Total Launches : {len(launches)}")
+    lines = read_file(FILE_PATH)
 
-# ==========================================================
-# Find Launch with Maximum Observations
-# ==========================================================
+    print(f"Done. Total Lines : {len(lines)}")
 
-print("\nStep 3 : Searching Maximum Profile...")
+    # ------------------------------------------------------
+    # Extract Metadata
+    # ------------------------------------------------------
 
+    print("\nStep 2 : Extracting Metadata...")
 
-selected_launch = None
+    launches = extract_metadata(lines)
 
-for launch in launches:
-
-    if (
-        launch["station"] == station_name
+    launches = [
+        launch for launch in launches
+        if launch["station"] == station_name
         and launch["station_number"] == station_number
-        and launch["launch"] == launch_time
-    ):
-
-        selected_launch = launch
-        break
-if selected_launch is None:
-
-    print("\nLaunch Not Found.")
-    quit()
-
-print("\nLaunch Found")
-print(selected_launch)
-
-print("\n" + "=" * 70)
-print("SELECTED LAUNCH")
-print("=" * 70)
-print(selected_launch)
-
-# ==========================================================
-# Load Best Launch
-# ==========================================================
-
-print("\nStep 4 : Loading Best Launch...")
-
-raw_data = extract_launch_lines(
-    lines,
-    selected_launch["start_line"]
-)
-
-df = create_dataframe(raw_data)
-
-print("\nOriginal Profile")
-print(df.head())
-
-df = interpolate_profile(df)
-
-print("\nInterpolated Profile")
-print(df.head())
-
-# ==========================================================
-# Remove Missing Values
-# ==========================================================
-
-df = df.dropna(
-    subset=[
-        "PRES",
-        "TEMP",
-        "DWPT"
     ]
-)
 
-# ==========================================================
-# Prepare Variables
-# ==========================================================
+    print(f"Done. Total Launches : {len(launches)}")
 
-pressure = df["PRES"].values * units.hPa
-temperature = df["TEMP"].values * units.degC
-dewpoint = df["DWPT"].values * units.degC
+    if not launches:
+        print("\nNo Launches Found For This Station.")
+        return
 
-# ==========================================================
-# Create Skew-T Diagram
-# ==========================================================
+    # ------------------------------------------------------
+    # Load + Interpolate ALL Profiles (One Time)
+    # ------------------------------------------------------
 
-print("\nStep 5 : Creating Skew-T Diagram...")
+    print("\nStep 3 : Loading & Interpolating All Profiles...")
 
-fig = plt.figure(figsize=(9, 9))
+    profiles = load_interpolated_profiles(lines, launches)
 
-skew = SkewT(fig)
-temperature = df["TEMP"].values
-dewpoint = df["DWPT"].values
+    if not profiles:
+        print("\nNo Profiles Could Be Loaded.")
+        return
 
-# Standard Skew-T Temperature Range
-skew.ax.set_xlim(-55, 50)
+    # ------------------------------------------------------
+    # Menu Loop
+    # ------------------------------------------------------
 
-skew.plot(
-    pressure,
-    temperature,
-    "r",
-    linewidth=2,
-    label="Temperature"
-)
+    while True:
 
-skew.plot(
-    pressure,
-    dewpoint,
-    "g",
-    linewidth=2,
-    label="Dew Point"
-)
+        choice = show_menu()
 
-skew.ax.set_title(
-    f'{selected_launch["station"]}  |  {selected_launch["launch"]}'
-)
+        if choice == "1":
 
-skew.ax.legend()
+            launch_time = format_launch_time(
+                input("\nLaunch Time (YYYY_MM_DD_HH) : ")
+            )
 
-# ==========================================================
-# Wind Barbs (Standard Pressure Levels)
-# ==========================================================
+            profile = find_profile(profiles, launch_time)
 
-standard_levels = [
-    1000,
-    925,
-    850,
-    700,
-    500,
-    400,
-    300,
-    250,
-    200,
-    150,
-    100
-]
+            if profile is None:
+                print("\nLaunch Not Found.")
+                continue
 
-wind_df = df.dropna(
-    subset=["PRES", "DRCT", "SPED"]
-).copy()
+            plot_skewt(profile)
 
-selected_rows = []
+        elif choice == "2":
+            plot_timeseries(profiles, "TEMP", "Temperature (\u00b0C)")
 
-for level in standard_levels:
+        elif choice == "3":
+            plot_timeseries(profiles, "RELH", "Relative Humidity (%)")
 
-    difference = (wind_df["PRES"] - level).abs()
+        elif choice == "4":
+            plot_timeseries(profiles, "SPED", "Wind Speed (m/s)")
 
-    if difference.empty:
-        continue
+        elif choice == "5":
+            plot_timeseries(profiles, "PRES", "Pressure (hPa)")
 
-    idx = difference.idxmin()
+        elif choice == "6":
+            print("\nExiting...")
+            break
 
-    if abs(wind_df.loc[idx, "PRES"] - level) <= 25:
-        selected_rows.append(idx)
+        else:
+            print("\nInvalid Choice.")
 
-wind_df = wind_df.loc[selected_rows]
 
-# ----------------------------------------------------------
-# Convert wind speed & direction to U and V components
-# ----------------------------------------------------------
-
-wind_speed = wind_df["SPED"].values * units("m/s")
-wind_direction = wind_df["DRCT"].values * units.degree
-
-u, v = wind_components(
-    wind_speed,
-    wind_direction
-)
-
-# ----------------------------------------------------------
-# Plot Wind Barbs
-# ----------------------------------------------------------
-
-skew.plot_barbs(
-    wind_df["PRES"].values * units.hPa,
-    u,
-    v,
-    xloc=1.1,      # aur right side le jao
-    length=6.5,
-    linewidth=0.8
-)
-
-plt.subplots_adjust(right=0.70)
-
-# ==========================================================
-# Save Figure
-# ==========================================================
-
-output_dir = Path("output/plots")
-output_dir.mkdir(
-    parents=True,
-    exist_ok=True
-)
-pressure = df["PRES"].values
-
-# ==========================================================
-# Standard Pressure Range (1050 -> 100 hPa)
-# ==========================================================
-
-skew.ax.set_ylim(1050, 100)
-skew.ax.set_yticks([
-    1000,
-    925,
-    850,
-    700,
-    500,
-    400,
-    300,
-    250,
-    200,
-    150,
-    100
-])
-filename = (
-    f"{selected_launch['station']}_"
-    f"{selected_launch['launch'].replace(':', '-')}.png"
-)
-
-save_path = output_dir / filename
-
-plt.savefig(
-    save_path,
-    dpi=300,
-    bbox_inches="tight",
-    pad_inches=0.4
-)
-
-plt.close()
-
-print("\nDiagram Saved Successfully")
-print(save_path)
+if __name__ == "__main__":
+    main()

@@ -19,11 +19,14 @@ def create_height_grid(
     step=100
 ):
     """
-    Create a regular height grid.
+    Create a regular height grid aligned to fixed
+    multiples of `step` (e.g. 0, 100, 200, ...) so the
+    same heights appear consistently across all launches,
+    regardless of each day's exact station elevation.
     """
 
-    start = int(min_height)
-    end = int(max_height)
+    start = int(np.ceil(min_height / step) * step)
+    end = int(np.floor(max_height / step) * step)
 
     return np.arange(
         start,

@@ -150,3 +150,38 @@ def create_dataframe(data_lines: List[str]) -> pd.DataFrame:
     df = df.reset_index(drop=True)
 
     return df
+
+def clean_dataframe(df):
+    """
+    Remove physically invalid rows so interpolation never
+    sees corrupt values — enforces PRES > 0 and strictly
+    increasing HGHT with strictly decreasing PRES.
+    """
+
+    df = df.dropna(subset=["PRES", "HGHT"]).copy()
+
+    df = df[df["PRES"] > 0]
+
+    df = df.sort_values("HGHT").reset_index(drop=True)
+
+    # ------------------------------------------------------
+    # Keep only rows where height increases AND
+    # pressure decreases relative to the last kept row.
+    # Any row violating this (corrupt reading) is dropped.
+    # ------------------------------------------------------
+
+    keep = [0]
+
+    for i in range(1, len(df)):
+
+        prev_idx = keep[-1]
+
+        if (
+            df.loc[i, "HGHT"] > df.loc[prev_idx, "HGHT"]
+            and df.loc[i, "PRES"] < df.loc[prev_idx, "PRES"]
+        ):
+            keep.append(i)
+
+    df = df.loc[keep].reset_index(drop=True)
+
+    return df

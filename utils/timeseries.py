@@ -115,11 +115,7 @@ def extract_variable_timeseries(
     height,
     variable
 ):
-    """
-    Extract one variable at a given height from
-    every interpolated radiosonde profile.
-    """
-
+    import numpy as np
     import pandas as pd
 
     rows = []
@@ -128,7 +124,7 @@ def extract_variable_timeseries(
 
         df = profile["profile"]
 
-        row = df[df["HGHT"] == height]
+        row = df[np.isclose(df["HGHT"], height)]
 
         if row.empty:
             continue
